@@ -93,8 +93,11 @@ private:
     CLI::App* _focusPaneCommand;
     CLI::App* _focusPaneShort;
     CLI::App* _saveCommand;
+    CLI::App* _sendInputCommand;
+    CLI::App* _exportBufferCommand;
 
     // Are you adding a new sub-command? Make sure to update _noCommandsProvided!
+    // NOTE: get-pane-info is planned but uses ExportBuffer for now.
 
     std::string _profileName;
     std::string _sessionId;
@@ -125,6 +128,8 @@ private:
     int _focusPaneTarget{ -1 };
     std::string _saveInputName;
     std::string _keyChordOption;
+    std::string _sendInputText;
+    std::string _exportBufferPath;
     // Are you adding more args here? Make sure to reset them in _resetStateToDefault
 
     const Commandline* _currentCommandline{ nullptr };
@@ -143,6 +148,8 @@ private:
     void _addNewTerminalArgs(NewTerminalSubcommand& subcommand);
     void _buildParser();
     void _buildSaveSnippetParser();
+    void _buildSendInputParser();
+    void _buildExportBufferParser();
     void _buildNewTabParser();
     void _buildSplitPaneParser();
     void _buildFocusTabParser();

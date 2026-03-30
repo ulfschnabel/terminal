@@ -209,6 +209,8 @@ void AppCommandlineArgs::_buildParser()
     _buildSwapPaneParser();
     _buildFocusPaneParser();
     _buildSaveSnippetParser();
+    _buildSendInputParser();
+    _buildExportBufferParser();
 }
 
 // Method Description:
@@ -603,6 +605,80 @@ void AppCommandlineArgs::_buildSaveSnippetParser()
     setupSubcommand(_saveCommand);
 }
 
+void AppCommandlineArgs::_buildSendInputParser()
+{
+    _sendInputCommand = _app.add_subcommand("send-input", "Send input text to the terminal");
+
+    auto setupSubcommand = [this](auto* subcommand) {
+        subcommand->add_option("--text,-t", _sendInputText, "The text to send to the terminal")->required();
+
+        subcommand->callback([&, this]() {
+            ActionAndArgs sendInputAction{};
+            sendInputAction.Action(ShortcutAction::SendInput);
+
+            // Process C-style escape sequences in the input text so that
+            // callers can send \r (Enter), \n, \t, \x1b (Escape), etc.
+            std::wstring processed;
+            auto wide = winrt::to_hstring(_sendInputText);
+            std::wstring_view input{ wide };
+            processed.reserve(input.size());
+
+            for (size_t i = 0; i < input.size(); ++i)
+            {
+                if (input[i] == L'\\' && i + 1 < input.size())
+                {
+                    switch (input[i + 1])
+                    {
+                    case L'n': processed += L'\n'; ++i; break;
+                    case L'r': processed += L'\r'; ++i; break;
+                    case L't': processed += L'\t'; ++i; break;
+                    case L'\\': processed += L'\\'; ++i; break;
+                    case L'x':
+                        // \x1b style hex escape
+                        if (i + 3 < input.size())
+                        {
+                            wchar_t hex[3] = { input[i + 2], input[i + 3], 0 };
+                            processed += static_cast<wchar_t>(wcstol(hex, nullptr, 16));
+                            i += 3;
+                        }
+                        break;
+                    default: processed += input[i]; break;
+                    }
+                }
+                else
+                {
+                    processed += input[i];
+                }
+            }
+
+            SendInputArgs args{ winrt::hstring{ processed } };
+            sendInputAction.Args(args);
+            _startupActions.push_back(sendInputAction);
+        });
+    };
+
+    setupSubcommand(_sendInputCommand);
+}
+
+void AppCommandlineArgs::_buildExportBufferParser()
+{
+    _exportBufferCommand = _app.add_subcommand("export-buffer", "Export the active pane's buffer to a file");
+
+    auto setupSubcommand = [this](auto* subcommand) {
+        subcommand->add_option("--path,-p", _exportBufferPath, "File path to write the buffer to")->required();
+
+        subcommand->callback([&, this]() {
+            ActionAndArgs exportAction{};
+            exportAction.Action(ShortcutAction::ExportBuffer);
+            ExportBufferArgs args{ winrt::to_hstring(_exportBufferPath) };
+            exportAction.Args(args);
+            _startupActions.push_back(exportAction);
+        });
+    };
+
+    setupSubcommand(_exportBufferCommand);
+}
+
 // Method Description:
 // - Add the `NewTerminalArgs` parameters to the given subcommand. This enables
 //   that subcommand to support all the properties in a NewTerminalArgs.
@@ -777,7 +853,9 @@ bool AppCommandlineArgs::_noCommandsProvided()
              *_focusPaneShort ||
              *_newPaneShort.subcommand ||
              *_newPaneCommand.subcommand ||
-             *_saveCommand);
+             *_saveCommand ||
+             *_sendInputCommand ||
+             *_exportBufferCommand);
 }
 
 // Method Description:
@@ -814,6 +892,8 @@ void AppCommandlineArgs::_resetStateToDefault()
 
     _focusPaneTarget = -1;
     _loadPersistedLayoutIdx = -1;
+    _sendInputText.clear();
+    _exportBufferPath.clear();
 
     // DON'T clear _launchMode here! This will get called once for every
     // subcommand, so we don't want `wt -F new-tab ; split-pane` clearing out
@@ -1002,21 +1082,25 @@ bool AppCommandlineArgs::ShouldExitEarly() const noexcept
 // - <none>
 void AppCommandlineArgs::ValidateStartupCommands()
 {
-    // If we only have a single x-save command, then set our target to the
-    // current terminal window. This will prevent us from spawning a new
-    // window just to save the commandline.
+    // If we only have a single x-save or send-input command, then set our
+    // target to the current terminal window. This will prevent us from
+    // spawning a new window just to run the command.
     if (_startupActions.size() == 1 &&
-        _startupActions.front().Action() == ShortcutAction::SaveSnippet &&
+        (_startupActions.front().Action() == ShortcutAction::SaveSnippet ||
+         _startupActions.front().Action() == ShortcutAction::SendInput ||
+         _startupActions.front().Action() == ShortcutAction::ExportBuffer) &&
         _windowTarget.empty())
     {
         _windowTarget = "0";
     }
     // If we parsed no commands, or the first command we've parsed is not a new
     // tab action, prepend a new-tab command to the front of the list.
-    // (also, we don't need to do this if the only action is a x-save)
+    // (also, we don't need to do this if the only action is a x-save or send-input)
     else if (_startupActions.empty() ||
              (_startupActions.front().Action() != ShortcutAction::NewTab &&
-              _startupActions.front().Action() != ShortcutAction::SaveSnippet))
+              _startupActions.front().Action() != ShortcutAction::SaveSnippet &&
+              _startupActions.front().Action() != ShortcutAction::SendInput &&
+              _startupActions.front().Action() != ShortcutAction::ExportBuffer))
     {
         // Build the NewTab action from the values we've parsed on the commandline.
         NewTerminalArgs newTerminalArgs{};
