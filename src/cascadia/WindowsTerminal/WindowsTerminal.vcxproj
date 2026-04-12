@@ -202,4 +202,15 @@
   <Import Project="$(OpenConsoleDir)\build\rules\GenerateSxsManifestsFromWinmds.targets" />
   <Import Project="$(OpenConsoleDir)src\common.nugetversions.targets" />
 
+  <!-- Workaround MSVC 19.44 ICE (C1001) in WindowEmperor.cpp during LTCG.
+       Disable LTCG for this project only — it's the startup/IPC exe, not perf-critical. -->
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <ClCompile>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
+    </ClCompile>
+    <Link>
+      <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
+    </Link>
+  </ItemDefinitionGroup>
+
 </Project>
