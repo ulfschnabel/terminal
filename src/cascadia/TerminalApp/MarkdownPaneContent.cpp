@@ -165,7 +165,9 @@ namespace winrt::TerminalApp::implementation
 
         if (const auto& strongControl{ _control.get() })
         {
-            Model::ActionAndArgs actionAndArgs{ ShortcutAction::SendInput, Model::SendInputArgs{ text } };
+            Model::SendInputArgs sendInputArgs{};
+            sendInputArgs.Input(text);
+            Model::ActionAndArgs actionAndArgs{ ShortcutAction::SendInput, sendInputArgs };
 
             // By using the last active control as the sender here, the
             // action dispatch will send this to the active control,

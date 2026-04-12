@@ -183,7 +183,29 @@ namespace winrt::TerminalApp::implementation
         }
         else if (const auto& realArgs = args.ActionArgs().try_as<SendInputArgs>())
         {
-            if (const auto termControl{ _senderOrActiveControl(sender) })
+            TermControl termControl{ nullptr };
+
+            if (!realArgs.Tab().empty())
+            {
+                // Find the target tab by title and get its active control.
+                for (const auto& t : _tabs)
+                {
+                    if (t.Title() == realArgs.Tab())
+                    {
+                        if (const auto impl = winrt::get_self<Tab>(t))
+                        {
+                            termControl = impl->GetActiveTerminalControl();
+                        }
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                termControl = _senderOrActiveControl(sender);
+            }
+
+            if (termControl)
             {
                 termControl.SendInput(realArgs.Input());
                 args.Handled(true);

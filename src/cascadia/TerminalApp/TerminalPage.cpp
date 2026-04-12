@@ -5477,7 +5477,9 @@ namespace winrt::TerminalApp::implementation
             return [weak, suggestion](auto&&, auto&&) {
                 if (auto page{ weak.get() })
                 {
-                    const auto actionAndArgs = ActionAndArgs{ ShortcutAction::SendInput, SendInputArgs{ hstring{ L"\u0003" } + suggestion } };
+                    SendInputArgs sendArgs{};
+                    sendArgs.Input(hstring{ L"\u0003" } + suggestion);
+                    const auto actionAndArgs = ActionAndArgs{ ShortcutAction::SendInput, sendArgs };
                     page->_actionDispatch->DoAction(actionAndArgs);
                     if (auto ctrl = page->_GetActiveControl())
                     {

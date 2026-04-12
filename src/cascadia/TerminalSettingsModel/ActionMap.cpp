@@ -1114,7 +1114,8 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
 
             const auto inArgs{ command.ActionAndArgs().Args().try_as<Model::SendInputArgs>() };
             const auto inputString{ inArgs ? inArgs.Input() : L"" };
-            auto args = winrt::make_self<SendInputArgs>(til::hstring_format(FMT_COMPILE(L"{:\x7f^{}}{}"), L"", numBackspaces, inputString));
+            auto args = winrt::make_self<SendInputArgs>();
+            args->Input(til::hstring_format(FMT_COMPILE(L"{:\x7f^{}}{}"), L"", numBackspaces, inputString));
             Model::ActionAndArgs actionAndArgs{ ShortcutAction::SendInput, *args };
 
             auto copy = cmdImpl->Copy();
@@ -1189,7 +1190,9 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
     {
         auto newAction = winrt::make<ActionAndArgs>();
         newAction.Action(ShortcutAction::SendInput);
-        auto sendInputArgs = winrt::make<SendInputArgs>(input);
+        auto sendInputArgsImpl = winrt::make_self<SendInputArgs>();
+        sendInputArgsImpl->Input(input);
+        auto sendInputArgs = sendInputArgsImpl.as<Model::SendInputArgs>();
         newAction.Args(sendInputArgs);
         auto cmd{ make_self<Command>() };
         if (!name.empty())

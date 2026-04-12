@@ -137,8 +137,9 @@ protected:                                                                  \
     X(float, Delta, "delta", false, ArgTypeHint::None, 0)
 
 ////////////////////////////////////////////////////////////////////////////////
-#define SEND_INPUT_ARGS(X) \
-    X(winrt::hstring, Input, "input", args->Input().empty(), ArgTypeHint::None, L"")
+#define SEND_INPUT_ARGS(X)                                                             \
+    X(winrt::hstring, Input, "input", args->Input().empty(), ArgTypeHint::None, L"")   \
+    X(winrt::hstring, Tab, "tab", false, ArgTypeHint::None, L"")
 
 ////////////////////////////////////////////////////////////////////////////////
 #define OPEN_SETTINGS_ARGS(X) \

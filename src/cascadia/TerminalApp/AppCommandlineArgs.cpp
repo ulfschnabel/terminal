@@ -652,7 +652,9 @@ void AppCommandlineArgs::_buildSendInputParser()
                 }
             }
 
-            SendInputArgs args{ winrt::hstring{ processed } };
+            SendInputArgs args{};
+            args.Input(winrt::hstring{ processed });
+            args.Tab(winrt::to_hstring(_sendInputTab));
             sendInputAction.Args(args);
             _startupActions.push_back(sendInputAction);
         });

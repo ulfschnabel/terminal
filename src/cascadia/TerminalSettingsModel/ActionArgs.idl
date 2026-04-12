@@ -254,9 +254,9 @@ namespace Microsoft.Terminal.Settings.Model
 
     [default_interface] runtimeclass SendInputArgs : IActionArgs, IActionArgsDescriptorAccess
     {
-        SendInputArgs(String input);
-
-        String Input { get; };
+        SendInputArgs();
+        String Input;
+        String Tab;
     };
 
     [default_interface] runtimeclass SplitPaneArgs : IActionArgs, IActionArgsDescriptorAccess
