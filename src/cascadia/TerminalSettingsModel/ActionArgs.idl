@@ -442,8 +442,12 @@ namespace Microsoft.Terminal.Settings.Model
 
     [default_interface] runtimeclass ExportBufferArgs : IActionArgs, IActionArgsDescriptorAccess
     {
-        ExportBufferArgs(String path);
-        String Path { get; };
+        ExportBufferArgs();
+        String Path;
+        String Tab;
+        Int32 Lines;
+        Boolean Ansi;
+        Boolean Json;
     };
 
     [default_interface] runtimeclass ClearBufferArgs : IActionArgs, IActionArgsDescriptorAccess

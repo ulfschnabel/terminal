@@ -129,7 +129,12 @@ private:
     std::string _saveInputName;
     std::string _keyChordOption;
     std::string _sendInputText;
+    std::string _sendInputTab;
     std::string _exportBufferPath;
+    std::string _exportBufferTab;
+    int _exportBufferLines{ 0 };
+    bool _exportBufferAnsi{ false };
+    bool _exportBufferJson{ false };
     // Are you adding more args here? Make sure to reset them in _resetStateToDefault
 
     const Commandline* _currentCommandline{ nullptr };

@@ -3714,6 +3714,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     {
         return _core.ReadEntireBuffer();
     }
+    hstring TermControl::ReadBufferWithAnsi(int32_t lastNLines) const
+    {
+        return _core.ReadBufferWithAnsi(lastNLines);
+    }
     Control::CommandHistoryContext TermControl::CommandHistory() const
     {
         return _core.CommandHistory();

@@ -347,7 +347,7 @@ namespace winrt::TerminalApp::implementation
         void _DuplicateFocusedTab();
         void _DuplicateTab(const Tab& tab);
 
-        safe_void_coroutine _ExportTab(const Tab& tab, winrt::hstring filepath);
+        safe_void_coroutine _ExportTab(const Tab& tab, const winrt::Microsoft::Terminal::Settings::Model::ExportBufferArgs& args);
 
         winrt::Windows::Foundation::IAsyncAction _HandleCloseTabRequested(winrt::TerminalApp::Tab tab);
         void _CloseTabAtIndex(uint32_t index);

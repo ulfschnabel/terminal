@@ -611,6 +611,7 @@ void AppCommandlineArgs::_buildSendInputParser()
 
     auto setupSubcommand = [this](auto* subcommand) {
         subcommand->add_option("--text,-t", _sendInputText, "The text to send to the terminal")->required();
+        subcommand->add_option("--tab", _sendInputTab, "Target tab by title");
 
         subcommand->callback([&, this]() {
             ActionAndArgs sendInputAction{};
@@ -662,15 +663,24 @@ void AppCommandlineArgs::_buildSendInputParser()
 
 void AppCommandlineArgs::_buildExportBufferParser()
 {
-    _exportBufferCommand = _app.add_subcommand("export-buffer", "Export the active pane's buffer to a file");
+    _exportBufferCommand = _app.add_subcommand("export-buffer", "Export pane buffer (default: stdout with ANSI)");
 
     auto setupSubcommand = [this](auto* subcommand) {
-        subcommand->add_option("--path,-p", _exportBufferPath, "File path to write the buffer to")->required();
+        subcommand->add_option("--path,-p", _exportBufferPath, "File path (omit for stdout)");
+        subcommand->add_option("--tab", _exportBufferTab, "Target tab by title");
+        subcommand->add_option("--lines,-n", _exportBufferLines, "Last N lines (0 = all)");
+        subcommand->add_flag("--ansi,-a", _exportBufferAnsi, "Include ANSI color codes");
+        subcommand->add_flag("--json,-j", _exportBufferJson, "Output as JSON with dimensions");
 
         subcommand->callback([&, this]() {
             ActionAndArgs exportAction{};
             exportAction.Action(ShortcutAction::ExportBuffer);
-            ExportBufferArgs args{ winrt::to_hstring(_exportBufferPath) };
+            ExportBufferArgs args{};
+            args.Path(winrt::to_hstring(_exportBufferPath));
+            args.Tab(winrt::to_hstring(_exportBufferTab));
+            args.Lines(_exportBufferLines);
+            args.Ansi(_exportBufferAnsi);
+            args.Json(_exportBufferJson);
             exportAction.Args(args);
             _startupActions.push_back(exportAction);
         });
@@ -893,7 +903,12 @@ void AppCommandlineArgs::_resetStateToDefault()
     _focusPaneTarget = -1;
     _loadPersistedLayoutIdx = -1;
     _sendInputText.clear();
+    _sendInputTab.clear();
     _exportBufferPath.clear();
+    _exportBufferTab.clear();
+    _exportBufferLines = 0;
+    _exportBufferAnsi = false;
+    _exportBufferJson = false;
 
     // DON'T clear _launchMode here! This will get called once for every
     // subcommand, so we don't want `wt -F new-tab ; split-pane` clearing out

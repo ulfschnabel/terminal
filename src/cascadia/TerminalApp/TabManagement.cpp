@@ -305,10 +305,12 @@ namespace winrt::TerminalApp::implementation
     }
 
     // Method Description:
-    // - Exports the content of the Terminal Buffer inside the tab
+    // - Exports the content of the Terminal Buffer inside the tab.
+    //   Supports ANSI colors, stdout output, tab targeting, and line limits.
     // Arguments:
-    // - tab: tab to export
-    safe_void_coroutine TerminalPage::_ExportTab(const Tab& tab, winrt::hstring filepath)
+    // - tab: default target tab (may be overridden by args.Tab())
+    // - args: export options from CLI or action args
+    safe_void_coroutine TerminalPage::_ExportTab(const Tab& tab, const winrt::Microsoft::Terminal::Settings::Model::ExportBufferArgs& args)
     {
         // This will be used to set up the file picker "filter", to select .txt
         // files by default.
@@ -323,48 +325,100 @@ namespace winrt::TerminalApp::implementation
 
         try
         {
-            if (const auto control{ tab.GetActiveTerminalControl() })
+            // If --tab specified, find that tab by title; otherwise use the provided tab.
+            TermControl control{ nullptr };
+            if (!args.Tab().empty())
             {
-                auto path = filepath;
-
-                if (path.empty())
+                for (const auto& t : _tabs)
                 {
-                    // GH#11356 - we can't use the UWP apis for writing the file,
-                    // because they don't work elevated (shocker) So just use the
-                    // shell32 file picker manually.
-                    std::wstring filename{ tab.Title() };
-                    filename = til::clean_filename(filename);
-                    path = co_await SaveFilePicker(*_hostingHwnd, [filename = std::move(filename)](auto&& dialog) {
-                        THROW_IF_FAILED(dialog->SetClientGuid(clientGuidExportFile));
-                        try
+                    if (t.Title() == args.Tab())
+                    {
+                        if (const auto impl = winrt::get_self<Tab>(t))
                         {
-                            // Default to the Downloads folder
-                            auto folderShellItem{ winrt::capture<IShellItem>(&SHGetKnownFolderItem, FOLDERID_Downloads, KF_FLAG_DEFAULT, nullptr) };
-                            dialog->SetDefaultFolder(folderShellItem.get());
+                            control = impl->GetActiveTerminalControl();
                         }
-                        CATCH_LOG(); // non-fatal
-                        THROW_IF_FAILED(dialog->SetFileTypes(ARRAYSIZE(supportedFileTypes), supportedFileTypes));
-                        THROW_IF_FAILED(dialog->SetFileTypeIndex(1)); // the array is 1-indexed
-                        THROW_IF_FAILED(dialog->SetDefaultExtension(L"txt"));
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                control = tab.GetActiveTerminalControl();
+            }
 
-                        // Default to using the tab title as the file name
-                        THROW_IF_FAILED(dialog->SetFileName((filename + L".txt").c_str()));
-                    });
+            if (!control) co_return;
+
+            // Read the buffer (with or without ANSI color codes).
+            hstring buffer;
+            if (args.Ansi())
+            {
+                buffer = control.ReadBufferWithAnsi(args.Lines());
+            }
+            else
+            {
+                buffer = control.ReadEntireBuffer();
+            }
+
+            auto path = args.Path();
+
+            if (path.empty() && !args.Ansi() && !args.Json())
+            {
+                // No path and no special output mode: show the file picker (GUI fallback).
+                std::wstring filename{ tab.Title() };
+                filename = til::clean_filename(filename);
+                path = co_await SaveFilePicker(*_hostingHwnd, [filename = std::move(filename)](auto&& dialog) {
+                    THROW_IF_FAILED(dialog->SetClientGuid(clientGuidExportFile));
+                    try
+                    {
+                        auto folderShellItem{ winrt::capture<IShellItem>(&SHGetKnownFolderItem, FOLDERID_Downloads, KF_FLAG_DEFAULT, nullptr) };
+                        dialog->SetDefaultFolder(folderShellItem.get());
+                    }
+                    CATCH_LOG(); // non-fatal
+                    THROW_IF_FAILED(dialog->SetFileTypes(ARRAYSIZE(supportedFileTypes), supportedFileTypes));
+                    THROW_IF_FAILED(dialog->SetFileTypeIndex(1)); // the array is 1-indexed
+                    THROW_IF_FAILED(dialog->SetDefaultExtension(L"txt"));
+                    THROW_IF_FAILED(dialog->SetFileName((filename + L".txt").c_str()));
+                });
+            }
+
+            if (!path.empty())
+            {
+                // Expand env vars the file picker won't provide.
+                path = winrt::hstring{ wil::ExpandEnvironmentStringsW<std::wstring>(path.c_str()) };
+                til::io::write_utf8_string_to_file_atomic(std::filesystem::path{ std::wstring_view{ path } }, til::u16u8(buffer));
+            }
+            else
+            {
+                // stdout output (--ansi or --json with no --path).
+                std::string output;
+                if (args.Json())
+                {
+                    // Emit JSON: {"title":"...","width":N,"height":N,"output":"..."}
+                    const auto titleUtf8 = til::u16u8(std::wstring_view{ tab.Title() });
+                    const auto bufUtf8 = til::u16u8(std::wstring_view{ buffer });
+                    // Escape the output string for JSON embedding.
+                    std::string escaped;
+                    escaped.reserve(bufUtf8.size());
+                    for (const char c : bufUtf8)
+                    {
+                        switch (c)
+                        {
+                        case '"': escaped += "\\\""; break;
+                        case '\\': escaped += "\\\\"; break;
+                        case '\n': escaped += "\\n"; break;
+                        case '\r': escaped += "\\r"; break;
+                        default: escaped += c; break;
+                        }
+                    }
+                    output = fmt::format("{{\"title\":\"{}\",\"output\":\"{}\"}}\n",
+                        titleUtf8,
+                        escaped);
                 }
                 else
                 {
-                    // The file picker isn't going to give us paths with
-                    // environment variables, but the user might have set one in
-                    // the settings. Expand those here.
-
-                    path = winrt::hstring{ wil::ExpandEnvironmentStringsW<std::wstring>(path.c_str()) };
+                    output = til::u16u8(std::wstring_view{ buffer });
                 }
-
-                if (!path.empty())
-                {
-                    const auto buffer = control.ReadEntireBuffer();
-                    til::io::write_utf8_string_to_file_atomic(std::filesystem::path{ std::wstring_view{ path } }, til::u16u8(buffer));
-                }
+                WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), output.data(), static_cast<DWORD>(output.size()), nullptr, nullptr);
             }
         }
         CATCH_LOG();

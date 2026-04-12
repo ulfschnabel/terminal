@@ -1206,14 +1206,16 @@ namespace winrt::TerminalApp::implementation
             {
                 if (const auto& realArgs = args.ActionArgs().try_as<ExportBufferArgs>())
                 {
-                    _ExportTab(*activeTab, realArgs.Path());
+                    _ExportTab(*activeTab, realArgs);
                     args.Handled(true);
                     return;
                 }
             }
 
-            // If we didn't have args, or the args weren't ExportBufferArgs (somehow)
-            _ExportTab(*activeTab, L"");
+            // If we didn't have args, or the args weren't ExportBufferArgs (somehow),
+            // fall back to showing the file picker with default args.
+            ExportBufferArgs defaultArgs{};
+            _ExportTab(*activeTab, defaultArgs);
             if (args)
             {
                 args.Handled(true);

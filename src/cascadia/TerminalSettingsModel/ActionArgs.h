@@ -263,8 +263,12 @@ protected:                                                                  \
     X(uint32_t, Id, "id", false, ArgTypeHint::None, 0u)
 
 ////////////////////////////////////////////////////////////////////////////////
-#define EXPORT_BUFFER_ARGS(X) \
-    X(winrt::hstring, Path, "path", false, ArgTypeHint::FilePath, L"")
+#define EXPORT_BUFFER_ARGS(X)                                                          \
+    X(winrt::hstring, Path, "path", false, ArgTypeHint::FilePath, L"")                 \
+    X(winrt::hstring, Tab, "tab", false, ArgTypeHint::None, L"")                       \
+    X(int32_t, Lines, "lines", false, ArgTypeHint::None, 0)                            \
+    X(bool, Ansi, "ansi", false, ArgTypeHint::None, false)                             \
+    X(bool, Json, "json", false, ArgTypeHint::None, false)
 
 ////////////////////////////////////////////////////////////////////////////////
 #define CLEAR_BUFFER_ARGS(X) \

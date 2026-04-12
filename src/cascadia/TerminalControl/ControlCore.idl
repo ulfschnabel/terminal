@@ -170,6 +170,7 @@ namespace Microsoft.Terminal.Control
         void EnablePainting();
 
         String ReadEntireBuffer();
+        String ReadBufferWithAnsi(Int32 lastNLines);
         CommandHistoryContext CommandHistory();
         Boolean QuickFixesAvailable { get; };
 

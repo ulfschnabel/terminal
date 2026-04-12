@@ -2372,6 +2372,81 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         return hstring{ str };
     }
 
+    static std::wstring attrToAnsi(const TextAttribute& attr)
+    {
+        std::wstring sgr;
+
+        const auto fg = attr.GetForeground();
+        if (fg.IsRgb())
+        {
+            const auto color = fg.GetRGB();
+            sgr += fmt::format(L"\x1b[38;2;{};{};{}m", GetRValue(color), GetGValue(color), GetBValue(color));
+        }
+        else if (fg.IsDefault())
+        {
+            sgr += L"\x1b[39m";
+        }
+
+        const auto bg = attr.GetBackground();
+        if (bg.IsRgb())
+        {
+            const auto color = bg.GetRGB();
+            sgr += fmt::format(L"\x1b[48;2;{};{};{}m", GetRValue(color), GetGValue(color), GetBValue(color));
+        }
+        else if (bg.IsDefault())
+        {
+            sgr += L"\x1b[49m";
+        }
+
+        if (attr.IsIntense()) sgr += L"\x1b[1m";
+        if (attr.IsFaint()) sgr += L"\x1b[2m";
+
+        return sgr;
+    }
+
+    hstring ControlCore::ReadBufferWithAnsi(int32_t lastNLines) const
+    {
+        const auto lock = _terminal->LockForWriting();
+        const auto& textBuffer = _terminal->GetTextBuffer();
+
+        std::wstring str;
+        const auto lastRow = textBuffer.GetLastNonSpaceCharacter().y;
+        const auto startRow = (lastNLines > 0) ? std::max(0, lastRow - lastNLines + 1) : 0;
+
+        TextAttribute prevAttr{};
+        bool firstAttr = true;
+
+        for (auto rowIndex = startRow; rowIndex <= lastRow; rowIndex++)
+        {
+            const auto& row = textBuffer.GetRowByOffset(rowIndex);
+            const auto cols = row.MeasureRight();
+
+            for (til::CoordType col = 0; col < cols; col++)
+            {
+                const auto attr = row.GetAttrByColumn(col);
+
+                if (firstAttr || attr != prevAttr)
+                {
+                    str += attrToAnsi(attr);
+                    prevAttr = attr;
+                    firstAttr = false;
+                }
+
+                const auto glyph = row.GlyphAt(col);
+                str += glyph;
+                if (glyph.size() > 1) col++; // skip trailing half of wide char
+            }
+
+            str += L"\x1b[0m";
+            if (!row.WasWrapForced())
+            {
+                str += L"\r\n";
+            }
+        }
+
+        return hstring{ str };
+    }
+
     // Get all of our recent commands. This will only really work if the user has enabled shell integration.
     Control::CommandHistoryContext ControlCore::CommandHistory() const
     {
