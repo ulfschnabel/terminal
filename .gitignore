@@ -286,3 +286,10 @@ profiles.json
 
 # MSBuildCache
 /MSBuildCacheLogs/
+
+# Build deployment artifacts (deploy/ is only for builds)
+/deploy/
+*.winmd
+*.appxrecipe
+*.pri
+*.xbf
