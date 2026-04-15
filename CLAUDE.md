@@ -253,35 +253,57 @@ runtimeclass ExportBufferArgs : IActionArgs, IActionArgsDescriptorAccess
 }
 ```
 
+### CRITICAL: Window targeting (not just tabs)
+
+Agent-deck spawns each Claude session in a **separate Windows Terminal window**, not as tabs in one window. The current `wtd -w 0` always targets the caller's own window.
+
+`export-buffer` and `send-input` MUST be able to target a specific window by its title. Each window's title matches the session/project name (e.g., "ValorFriend", "Session Bridge").
+
+**Use `--window <title>` to find the right WT window:**
+
+```bash
+# Capture from a specific WT window by title
+wtd export-buffer --window "ValorFriend" --ansi --lines 50
+
+# Send input to a specific WT window
+wtd send-input --window "ValorFriend" --text "hello\r"
+```
+
+Implementation: enumerate all Windows Terminal windows (by window class or process), match by window title, then operate on that window's active pane/tab.
+
+Windows API approach:
+- `EnumWindows` + `GetWindowText` to find WT windows by title
+- Or enumerate `WindowsTerminal.exe` processes via `EnumProcesses`
+- Send `WM_COPYDATA` to the target window (same IPC `wtd` already uses)
+
+**This is the #1 blocker** — without window targeting, all sessions show the same terminal content.
+
 ### Expected usage after changes
 
 ```bash
-# Capture active tab with ANSI → stdout
-wtd export-buffer --ansi
-
-# Capture specific tab, last 50 lines, with ANSI → stdout
-wtd export-buffer --tab "my-session" --ansi --lines 50
+# Capture from specific window with ANSI → stdout
+wtd export-buffer --window "ValorFriend" --ansi --lines 50
 
 # JSON with dimensions → stdout
-wtd export-buffer --tab "my-session" --ansi --json --lines 50
-# Output: {"title":"my-session","width":120,"height":40,"output":"\x1b[38;2;78;186;101m⏺..."}
+wtd export-buffer --window "ValorFriend" --ansi --json --lines 50
 
-# Plain text to file (backwards compatible)
-wtd export-buffer --path C:\output.txt
+# Send input to specific window
+wtd send-input --window "ValorFriend" --text "hello\r"
 
-# Send input to specific tab
-wtd send-input --tab "my-session" --text "hello\r"
+# Fallback: capture active window (no --window flag)
+wtd export-buffer --ansi
 ```
 
 ### Testing
 
 ```bash
-# Should show ANSI escape codes
-wtd export-buffer --ansi | findstr /R "\[38"
+# Should show ANSI escape codes from a specific session
+wtd export-buffer --window "ValorFriend" --ansi | findstr /R "\[38"
 
-# Compare with Unix equivalent (should look identical):
-# Unix:  tmux capture-pane -t "session" -p -e -S -50
-# Win:   wtd export-buffer --tab "session" --ansi --lines 50
+# Two different windows should produce different output
+wtd export-buffer --window "ValorFriend" --ansi > a.txt
+wtd export-buffer --window "Session Bridge" --ansi > b.txt
+fc a.txt b.txt
 ```
 
 ## Building
